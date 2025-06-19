@@ -26,6 +26,7 @@ Write-Host "Container Name: $containerName"
 # Validate the request body
 if (-not $Request.Body -or $Request.Body.Count -eq 0) {
     Write-Error "Request body is empty or invalid."
+    Write-Host "Request body content: $($Request.Body | Out-String)"
     Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
         StatusCode = [HttpStatusCode]::BadRequest
         Body = "Request body must contain an array of blob names and tags."
