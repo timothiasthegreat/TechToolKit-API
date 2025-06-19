@@ -19,8 +19,13 @@ if (-not $storageAccountName -or -not $storageAccountKey -or -not $containerName
     return
 }
 
+Write-Host "Storage account details retrieved successfully."
+Write-Host "Storage Account Name: $storageAccountName"
+Write-Host "Container Name: $containerName"
+
 # Validate the request body
 if (-not $Request.Body -or $Request.Body.Count -eq 0) {
+    Write-Error "Request body is empty or invalid."
     Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
         StatusCode = [HttpStatusCode]::BadRequest
         Body = "Request body must contain an array of blob names and tags."
@@ -28,19 +33,33 @@ if (-not $Request.Body -or $Request.Body.Count -eq 0) {
     return
 }
 
+Write-Host "Request body validated successfully."
+
 # Create the Blob Storage context
-$context = New-AzStorageContext -StorageAccountName $storageAccountName -StorageAccountKey $storageAccountKey
+try {
+    $context = New-AzStorageContext -StorageAccountName $storageAccountName -StorageAccountKey $storageAccountKey
+    Write-Host "Azure Storage context created successfully."
+} catch {
+    Write-Error "Failed to create Azure Storage context: $_"
+    Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+        StatusCode = [HttpStatusCode]::InternalServerError
+        Body = "Failed to create Azure Storage context."
+    })
+    return
+}
 
 # Process each blob in the request body
 foreach ($blobEntry in $Request.Body) {
     if (-not $blobEntry.Name -or -not $blobEntry.Tags) {
-        Write-Error "Each entry must contain 'Name' and 'Tags'."
+        Write-Error "Invalid blob entry. Each entry must contain 'Name' and 'Tags'."
         Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
             StatusCode = [HttpStatusCode]::BadRequest
             Body = "Each entry must contain 'Name' and 'Tags'."
         })
         return
     }
+
+    Write-Host "Processing blob: $($blobEntry.Name)"
 
     try {
         # Set tags on the blob
@@ -55,6 +74,8 @@ foreach ($blobEntry in $Request.Body) {
         return
     }
 }
+
+Write-Host "All blobs processed successfully."
 
 # Respond with success
 Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
