@@ -33,6 +33,7 @@ if (-not $Request.Body) {
 # Parse the file from the request body
 $fileContent = $Request.Body
 $fileName = $Request.Query.FileName
+$overwrite = $Request.Query.Overwrite
 
 if (-not $fileName) {
     $fileName = "uploaded-file-" + (Get-Date -Format "yyyyMMddHHmmss") + ".txt"
@@ -40,6 +41,22 @@ if (-not $fileName) {
 
 # Create the Blob Storage context
 $context = New-AzStorageContext -StorageAccountName $storageAccountName -StorageAccountKey $storageAccountKey
+
+# Check if the blob already exists
+$existingBlob = Get-AzStorageBlob -Container $containerName -Context $context | Where-Object { $_.Name -eq $fileName }
+
+if ($existingBlob) {
+    if ($overwrite -eq "yes") {
+        Write-Host "Blob with name '$fileName' exists. Overwriting as 'overwrite=yes' is specified."
+    } else {
+        Write-Host "Blob with name '$fileName' already exists. Returning conflict message."
+        Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+            StatusCode = [HttpStatusCode]::Conflict
+            Body = "A blob with the name '$fileName' already exists. Use 'overwrite=yes' in the query to replace it."
+        })
+        return
+    }
+}
 
 # Upload the file to the Blob Storage container
 try {
