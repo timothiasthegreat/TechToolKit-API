@@ -4,7 +4,7 @@ param($Request, $TriggerMetadata)
 
 Write-Information "PowerShell HTTP trigger function processed a request."
 
-function Get-BlobListAsJson {
+function Get-BlobListWithTagsAsJson {
     param(
         [string]$StorageAccountName,
         [string]$StorageAccountKey,
@@ -17,8 +17,17 @@ function Get-BlobListAsJson {
 
     $context = New-AzStorageContext -StorageAccountName $StorageAccountName -StorageAccountKey $StorageAccountKey
     $blobs = Get-AzStorageBlob -Container $ContainerName -Context $context
-    $blobNames = $blobs | Select-Object -ExpandProperty Name
-    return ($blobNames | ConvertTo-Json)
+
+    $blobDetails = @()
+    foreach ($blob in $blobs) {
+        $tags = Get-AzStorageBlobTag -Blob $blob.Name -Container $ContainerName -Context $context
+        $blobDetails += @{
+            Name = $blob.Name
+            Tags = $tags.Tags
+        }
+    }
+
+    return ($blobDetails | ConvertTo-Json -Depth 10)
 }
 
 $Request | Format-List | Out-String | Write-Information
@@ -48,8 +57,8 @@ if ($Request.Method -eq "GET") {
     }
 
     try {
-        Write-Information "Listing blobs in container: $containerName"
-        $jsonBlobs = Get-BlobListAsJson -StorageAccountName $storageAccountName -StorageAccountKey $storageAccountKey -ContainerName $containerName
+        Write-Information "Listing blobs with tags in container: $containerName"
+        $jsonBlobs = Get-BlobListWithTagsAsJson -StorageAccountName $storageAccountName -StorageAccountKey $storageAccountKey -ContainerName $containerName
         Push-OutputBinding -Name Response -Value @{
             StatusCode = 200
             Body = $jsonBlobs
@@ -58,9 +67,9 @@ if ($Request.Method -eq "GET") {
     } catch {
         Push-OutputBinding -Name Response -Value @{
             StatusCode = 500
-            Body = "Failed to list blobs: $_"
+            Body = "Failed to list blobs with tags: $_"
         }
-        Write-Information "Failed to list blobs: $_"
+        Write-Information "Failed to list blobs with tags: $_"
     }
     return
 }
