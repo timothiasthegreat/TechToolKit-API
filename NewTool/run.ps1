@@ -1,6 +1,5 @@
 using namespace System.Net
 using namespace System.IO
-using namespace Newtonsoft.Json
 
 # Input bindings are passed in via param block.
 param($Request, $TriggerMetadata)
@@ -31,28 +30,12 @@ if (-not $Request.Body) {
     return
 }
 
-# Parse the file and tags from the request body
+# Parse the file from the request body
 $fileContent = $Request.Body
 $fileName = $Request.Query.FileName
-$tagsJson = $Request.Query.Tags
 
 if (-not $fileName) {
     $fileName = "uploaded-file-" + (Get-Date -Format "yyyyMMddHHmmss") + ".txt"
-}
-
-# Parse tags if provided
-$tags = @{}
-if ($tagsJson) {
-    try {
-        $tags = ConvertFrom-Json -InputObject $tagsJson
-    } catch {
-        Write-Error "Invalid JSON format for tags: $_"
-        Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
-            StatusCode = [HttpStatusCode]::BadRequest
-            Body = "Invalid JSON format for tags."
-        })
-        return
-    }
 }
 
 # Create the Blob Storage context
@@ -60,24 +43,17 @@ $context = New-AzStorageContext -StorageAccountName $storageAccountName -Storage
 
 # Upload the file to the Blob Storage container
 try {
-    $blob = Set-AzStorageBlobContent -Container $containerName -FileContent $fileContent -Blob $fileName -Context $context
+    Set-AzStorageBlobContent -Container $containerName -FileContent $fileContent -Blob $fileName -Context $context
     Write-Host "File uploaded successfully to blob storage."
-
-    # Apply tags to the blob
-    if ($tags.Count -gt 0) {
-        Write-Host "Applying tags to blob: $fileName"
-        Set-AzStorageBlobTag -Blob $fileName -Container $containerName -Tag $tags -Context $context
-        Write-Host "Tags applied successfully to blob."
-    }
 
     Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
         StatusCode = [HttpStatusCode]::OK
-        Body = "File uploaded successfully as $fileName with tags."
+        Body = "File uploaded successfully as $fileName."
     })
 } catch {
-    Write-Error "Failed to upload file or apply tags to blob storage: $_"
+    Write-Error "Failed to upload file to blob storage: $_"
     Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
         StatusCode = [HttpStatusCode]::InternalServerError
-        Body = "Failed to upload file or apply tags to blob storage."
+        Body = "Failed to upload file to blob storage."
     })
 }
