@@ -65,7 +65,7 @@ try {
 
     # Apply tags to the blob
     if ($tags.Count -gt 0) {
-        $blobUri = $blob.ICloudBlob.Uri.AbsoluteUri
+        Write-Host "Applying tags to blob: $fileName"
         Set-AzStorageBlobTag -Blob $fileName -Container $containerName -Tags $tags -Context $context
         Write-Host "Tags applied successfully to blob."
     }
